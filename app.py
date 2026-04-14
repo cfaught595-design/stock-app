@@ -65,6 +65,7 @@ if ticker:
 
     # -- Compute a derived column -------------------------
         df["Daily Return"] = df["Close"].pct_change()
+        df["Cumulative Return"] = (1 + df["Daily Return"]).cumprod() - 1
         df[f"{ma_window}-Day MA"] = df["Close"].rolling(window=ma_window).mean()
 
     if ma_window > len(df):
@@ -146,5 +147,21 @@ if ticker:
         template="plotly_white", height=350
     )
     st.plotly_chart(fig_hist, width="stretch")
+    # -- Cumulative return chart --------------------------
+    st.subheader("Cumulative Return Over Time")
+
+    fig_cum = go.Figure()
+    fig_cum.add_trace(
+        go.Scatter(
+            x=df.index, y=df["Cumulative Return"],
+            mode="lines", name="Cumulative Return",
+            fill="tozeroy", line=dict(color="teal")
+        )
+    )
+    fig_cum.update_layout(
+        yaxis_title="Cumulative Return", yaxis_tickformat=".0%",
+        xaxis_title="Date", template="plotly_white", height=400
+    )
+    st.plotly_chart(fig_cum, width="stretch")
 else:
     st.info("Enter a stock ticker in the sidebar to get started.")
