@@ -10,6 +10,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import date, timedelta
 import math
+import numpy as np
+from scipy import stats
 
 # -- Page configuration ----------------------------------
 # st.set_page_config must be the FIRST Streamlit command in the script.
@@ -72,17 +74,17 @@ if ticker:
         df.columns = df.columns.get_level_values(0)
 
     # -- Compute a derived column -------------------------
-        df["Daily Return"] = df["Close"].pct_change()
-        df["Cumulative Return"] = (1 + df["Daily Return"]).cumprod() - 1
-        df["Rolling Volatility"] = df["Daily Return"].rolling(window=vol_window).std() * math.sqrt(252)
-        df[f"{ma_window}-Day MA"] = df["Close"].rolling(window=ma_window).mean()
+    df["Daily Return"] = df["Close"].pct_change()
+    df["Cumulative Return"] = (1 + df["Daily Return"]).cumprod() - 1
+    df["Rolling Volatility"] = df["Daily Return"].rolling(window=vol_window).std() * math.sqrt(252)
+    df[f"{ma_window}-Day MA"] = df["Close"].rolling(window=ma_window).mean()
 
     if ma_window > len(df):
         st.warning(
-        f"The selected {ma_window}-day window is longer than the "
-        f"available data ({len(df)} trading days). The moving average "
-        "line won't appear — try a shorter window or a wider date range."
-    )
+            f"The selected {ma_window}-day window is longer than the "
+            f"available data ({len(df)} trading days). The moving average "
+            "line won't appear — try a shorter window or a wider date range."
+        )
     # -- Key metrics --------------------------------------
     latest_close = float(df["Close"].iloc[-1])
     total_return = float(df["Cumulative Return"].iloc[-1])
@@ -156,19 +158,42 @@ if ticker:
     # -- Daily returns distribution -----------------------
     st.subheader("Distribution of Daily Returns")
 
+    returns_clean = df["Daily Return"].dropna()
+
     fig_hist = go.Figure()
     fig_hist.add_trace(
-        go.Histogram(
-            x=df["Daily Return"].dropna(), nbinsx=60,
-            marker_color="mediumpurple", opacity=0.75
+            go.Histogram(
+                x=returns_clean, nbinsx=60,
+                marker_color="mediumpurple", opacity=0.75,
+                name="Daily Returns", histnorm="probability density"
+            )
         )
-    )
+
+        # Overlay a fitted normal distribution curve
+    x_range = np.linspace(float(returns_clean.min()), float(returns_clean.max()), 200)
+    mu = float(returns_clean.mean())
+    sigma = float(returns_clean.std())
+    fig_hist.add_trace(
+            go.Scatter(
+                x=x_range, y=stats.norm.pdf(x_range, mu, sigma),
+                mode="lines", name="Normal Distribution",
+                line=dict(color="red", width=2)
+            )
+        )
+
     fig_hist.update_layout(
-        xaxis_title="Daily Return", yaxis_title="Frequency",
-        template="plotly_white", height=350
-    )
+            xaxis_title="Daily Return", yaxis_title="Density",
+            template="plotly_white", height=350
+        )
     st.plotly_chart(fig_hist, width="stretch")
-    # -- Cumulative return chart --------------------------
+
+            # Display normality test results
+    jb_stat, jb_pvalue = stats.jarque_bera(returns_clean)
+    st.caption(
+            f"**Jarque-Bera test:** statistic = {jb_stat:.2f}, p-value = {jb_pvalue:.4f} — "
+            f"{'Fail to reject normality (p > 0.05)' if jb_pvalue > 0.05 else 'Reject normality (p <= 0.05)'}"
+            )
+        # -- Cumulative return chart --------------------------
     st.subheader("Cumulative Return Over Time")
 
     fig_cum = go.Figure()
