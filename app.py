@@ -74,7 +74,7 @@ if ticker:
         df.columns = df.columns.get_level_values(0)
 
     # -- Compute a derived column -------------------------
-    df["Daily Return"] = df["Close"].pct_change()
+    df["Daily Return"] = df["Close"].squeeze().pct_change()
     df["Cumulative Return"] = (1 + df["Daily Return"]).cumprod() - 1
     df["Rolling Volatility"] = df["Daily Return"].rolling(window=vol_window).std() * math.sqrt(252)
     df[f"{ma_window}-Day MA"] = df["Close"].rolling(window=ma_window).mean()
@@ -228,5 +228,7 @@ if ticker:
     # -- Raw data (expandable) ----------------------------
     with st.expander("View Raw Data"):
         st.dataframe(df.tail(60), width="stretch")
+        csv = df.to_csv().encode('utf-8')
+        st.download_button("Download CSV", csv, f"{ticker}_data.csv", "text/csv")
 else:
     st.info("Enter a stock ticker in the sidebar to get started.")
